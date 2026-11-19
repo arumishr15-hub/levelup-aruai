@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="levelup-relay" content="">
+<title>LevelUp_AruAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: playful arcade tutor for a young coder, friendly but precise.
+   IDEA: a handheld game console: the code is the screen, the teacher sits beside it.
+   PICTURE: the live question card with its code screen and step-through trace.
+   COLOUR and TYPE: sakura pink band with falling petals, petal white, branch-brown ink, plum code screen; Fredoka titles, Nunito body, JetBrains Mono code.
+   LAYOUT: blossom status band (mode, level, XP) → topic chips + any-topic box → question | teacher → chat | agent channel + topic meters. */
+:root{color-scheme:light dark;
+--bg:light-dark(#fff8fa,#221318);--card:light-dark(rgba(255,255,255,.84),rgba(49,27,35,.86));--ink:light-dark(#5a2f35,#fbecef);
+--soft:light-dark(#9a6b70,#d8b3bc);--line:light-dark(#fbdde6,#553040);
+--blue:#e88aa8;--deep:#c25b7c;--yel:#ffd6e3;--good:#1f9d6a;--bad:#d9480f;
+--screen:#3b2129;--screen-ink:#fff1f4;--hl:rgba(255,214,227,.16)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);isolation:isolate;font:16px/1.55 Nunito,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Fredoka,Nunito,sans-serif;font-weight:600;line-height:1.1;margin:0}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--yel);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 max(4vw,16px)}
+/* status band */
+.top{position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(255,233,240,.88),rgba(251,208,221,.82) 60%,rgba(246,188,205,.85));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#5a2f35;padding:22px 0 18px;border-bottom:6px solid #f2a7bd}
+.top .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:14px;align-items:center}
+.brand h1{font-size:clamp(28px,4vw,40px)}
+.brand p{margin:2px 0 0;opacity:.85;font-size:15px}
+.stats{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.pill{background:rgba(255,255,255,.6);border-radius:14px;padding:8px 14px;white-space:nowrap}
+.pill b{font-family:Fredoka,sans-serif;font-size:20px;font-weight:600;margin-left:4px}
+.xp{width:min(260px,70vw)}
+.xp .bar{height:12px;border-radius:8px;background:rgba(194,91,124,.18);overflow:hidden;margin-top:6px}
+.xp .bar i{display:block;height:100%;background:linear-gradient(90deg,#f2a7bd,#c25b7c);width:0;transition:width .6s ease}
+.xp small{opacity:.85;font-size:13px}
+.petals{position:absolute;inset:0;pointer-events:none}
+.petals svg{position:absolute;width:22px;height:22px;opacity:.75;animation:fall 9s linear infinite}
+@keyframes fall{from{transform:translateY(-30px) rotate(0)}to{transform:translateY(160px) rotate(220deg)}}
+.top .wrap{position:relative}
+/* photo background: Aru under the cherry tree, behind a soft veil */
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:url(bg.jpg) center 20%/cover no-repeat}
+body::after{content:"";position:fixed;inset:0;z-index:-1;background:light-dark(rgba(255,246,249,.38),rgba(34,19,24,.62))}
+.card{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.chip{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.chip:not([aria-pressed=true]){background:light-dark(rgba(255,255,255,.85),rgba(49,27,35,.85))}
+/* live mode */
+.pill.mode{font:700 16px Nunito,sans-serif;color:inherit;border:0;min-height:44px}
+.pill.mode.live{background:#c25b7c;color:#fff}
+.custom{display:flex;gap:8px;padding:8px 0 0;flex-wrap:wrap}
+.custom input,.chatform input{flex:1 1 220px;font:16px Nunito,sans-serif;padding:10px 14px;min-height:44px;border-radius:12px;border:2px solid var(--line);background:light-dark(rgba(255,255,255,.92),rgba(34,19,24,.85));color:var(--ink)}
+.custom input:focus-visible,.chatform input:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.lower .chat{grid-row:span 2;display:flex;flex-direction:column}
+.chat .msgs{display:flex;flex-direction:column;gap:8px;flex:1 1 0;min-height:220px;overflow-y:auto;padding:2px}
+.cm{border-radius:14px;padding:10px 14px;max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm.ai{background:light-dark(#fff0f5,#3b2129);align-self:flex-start;border-bottom-left-radius:4px}
+.cm.user{background:var(--deep);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.chatform{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.start{text-align:center;padding:24px 8px}
+.start h2{font-size:30px;margin-bottom:8px}
+.start p{color:var(--soft);max-width:46ch;margin:0 auto 18px}
+.start .actions{justify-content:center}
+.working{padding:30px 8px}
+.working ol{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:10px}
+.working li{display:flex;gap:10px;align-items:center;color:var(--soft)}
+.working li.on{color:var(--ink);font-weight:700}
+.working li.done{color:var(--good)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none}
+.on .dot{background:var(--blue);animation:pulse 1s ease-in-out infinite}
+.done .dot{background:var(--good)}
+@keyframes pulse{50%{transform:scale(1.5);opacity:.6}}
+.badge{font-size:12px;font-weight:700;border-radius:8px;padding:3px 9px}
+.badge.ok{background:light-dark(#e3f5ec,#123a2a);color:var(--good)}
+.badge.fix{background:light-dark(#fff1dc,#3d2a10);color:light-dark(#9a5b00,#ffc77a)}
+.typing::after{content:"▍";animation:pulse 1s infinite}
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:18px 0 4px}
+.chip{border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 16px;min-height:44px;font-weight:700}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+/* main grid */
+.main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;padding:14px 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 8px 24px rgba(194,91,124,.08)}
+.qhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tag{font-size:13px;font-weight:700;background:light-dark(#ffe8ef,#553040);color:light-dark(var(--deep),#ffd6e3);border-radius:8px;padding:3px 10px}
+.lvl{background:var(--deep);color:#fff}
+.screen{background:var(--screen);color:var(--screen-ink);border-radius:14px;padding:16px 0;font:15px/1.6 "JetBrains Mono",ui-monospace,monospace;overflow-x:auto;border:4px solid light-dark(#f6bfd0,#6b3a48)}
+.ln{display:flex;padding:0 16px;border-left:4px solid transparent;transition:background .2s}
+.ln.on{background:var(--hl);border-left-color:var(--yel)}
+.ln .n{width:2.2em;flex:none;color:#b88a92;user-select:none}
+.ln code{white-space:pre}
+.k{color:#ffa3bf}.s{color:#c4e8b8}.d{color:#ffd6a0}.f{color:#f2c4d4}.c{color:#b88a92}
+.prompt{font-family:Fredoka,sans-serif;font-size:22px;margin:18px 0 12px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.opt{text-align:left;background:var(--bg);color:var(--ink);border:2px solid var(--line);border-radius:14px;padding:12px 14px;min-height:56px;display:flex;gap:10px;align-items:flex-start;transition:transform .12s,border-color .12s}
+.opt:hover:not(:disabled){border-color:var(--blue);transform:translateY(-1px)}
+.opt kbd{font:600 13px Fredoka,sans-serif;background:var(--line);border-radius:6px;padding:1px 7px;flex:none}
+.opt span{font:15px/1.4 "JetBrains Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.opt.right{border-color:var(--good);background:light-dark(#e9f8f0,#103a2a)}
+.opt.wrong{border-color:var(--bad);background:light-dark(#fdece4,#3d1d10)}
+.opt:disabled{cursor:default}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.btn{border:0;border-radius:12px;padding:10px 18px;min-height:44px;font-weight:700}
+.btn.main{background:var(--deep);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+/* teacher */
+.teacher h2{font-size:24px;display:flex;gap:10px;align-items:center}
+.avatar{width:40px;height:40px;flex:none}
+.who{font:700 13px Nunito,sans-serif;color:var(--soft);display:block;margin-bottom:2px}
+.lesson p{margin:10px 0}
+.lesson pre{background:light-dark(#fff0f6,#3a1430);border-radius:10px;padding:10px 12px;font:14px/1.5 "JetBrains Mono",monospace;margin:8px 0;overflow-x:auto}
+.tip{border-left:4px solid var(--yel);padding:4px 12px;color:var(--soft);font-size:15px}
+.bubble{border-radius:14px;padding:12px 14px;margin-top:14px;font-size:16px}
+.bubble.hint{background:light-dark(#fde4ef,#4a1d38)}
+.bubble.good{background:light-dark(#e6f6ee,#103a2a)}
+.bubble.bad{background:light-dark(#fdece4,#3d1d10)}
+.stepper{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:12px}
+.stepper header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.stepper .nav{display:flex;gap:6px}
+.stepper .nav button{width:44px;height:44px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font-weight:700}
+.vars{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:30px}
+.var{font:13px "JetBrains Mono",monospace;background:light-dark(#fff0f6,#3a1430);border-radius:8px;padding:4px 8px}
+.var b{color:var(--blue)}
+.scope{font-size:13px;color:var(--soft)}
+code.i{font:14px "JetBrains Mono",monospace;background:light-dark(#fde4ef,#3a1430);padding:1px 5px;border-radius:5px}
+/* bottom */
+.lower{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;padding-bottom:40px}
+.lower h3{font-size:20px;margin-bottom:10px}
+.log{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.msg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:baseline;padding:6px 10px;border-radius:10px;background:var(--bg)}
+.msg .who2{font:600 12px Fredoka,sans-serif;border-radius:6px;padding:2px 8px;white-space:nowrap}
+.from-q .who2{background:#f6bccd;color:#5a2f35}
+.from-t .who2{background:var(--deep);color:#fff}
+.from-c .who2{background:var(--line);color:var(--ink)}
+.meter{display:grid;grid-template-columns:7.5em minmax(0,1fr) 3.5em;gap:10px;align-items:center;font-size:15px;padding:5px 0}
+.meter .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+.meter .track i{display:block;height:100%;background:var(--blue);border-radius:6px}
+.meter .pct{text-align:right;color:var(--soft);font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--soft);margin-top:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(140%);background:var(--deep);color:#fff;font:600 18px Fredoka,sans-serif;padding:12px 22px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .35s ease,opacity .35s;z-index:5;opacity:0;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.loading{padding:40px;text-align:center;color:var(--soft)}
+.opt:not(.right):not(.wrong){background:light-dark(rgba(255,248,250,.9),rgba(34,19,24,.75))}
+.msg{background:light-dark(rgba(255,248,250,.9),rgba(34,19,24,.7))}
+@media(max-width:860px){.main,.lower{grid-template-columns:minmax(0,1fr)}.lower .chat{grid-row:auto}.chat .msgs{flex:none;max-height:420px}}
+@media(max-width:520px){.opts{grid-template-columns:minmax(0,1fr)}.card{padding:16px}.screen{font-size:13px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="petals" aria-hidden="true"><svg viewBox="0 0 20 20" style="left:6%;top:-10px;animation-delay:0s;width:18px;height:18px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#f6bccd"/></svg><svg viewBox="0 0 20 20" style="left:22%;top:10px;animation-delay:3s;width:14px;height:14px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#eda0b8"/></svg><svg viewBox="0 0 20 20" style="left:38%;top:-20px;animation-delay:6s;width:20px;height:20px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#f2a7bd"/></svg><svg viewBox="0 0 20 20" style="left:55%;top:0px;animation-delay:1.5s;width:16px;height:16px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#eda0b8"/></svg><svg viewBox="0 0 20 20" style="left:68%;top:-15px;animation-delay:4.5s;width:22px;height:22px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#f6bccd"/></svg><svg viewBox="0 0 20 20" style="left:83%;top:5px;animation-delay:2.5s;width:15px;height:15px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#eda0b8"/></svg><svg viewBox="0 0 20 20" style="left:94%;top:-25px;animation-delay:7s;width:19px;height:19px"><path d="M10 2c4 3 6 7 3 12-1 2-2 3-3 4-1-1-2-2-3-4C4 9 6 5 10 2z" fill="#f2a7bd"/></svg></div>
+  <div class="wrap">
+    <div class="brand">
+      <svg class="avatar" viewBox="0 0 40 40" aria-hidden="true" style="width:48px;height:48px"><path d="M20 3c-7 0-8 3-8 6v4h9v2H8c-4 0-6 3-6 8s2 8 6 8h3v-5c0-3 3-6 6-6h8c3 0 5-2 5-5V9c0-3-3-6-10-6z" fill="#c25b7c"/><path d="M20 37c7 0 8-3 8-6v-4h-9v-2h13c4 0 6-3 6-8s-2-8-6-8h-3v5c0 3-3 6-6 6h-8c-3 0-5 2-5 5v6c0 3 3 6 10 6z" fill="#f2a7bd"/><circle cx="16" cy="8" r="1.8" fill="#fff"/><circle cx="24" cy="32" r="1.8" fill="#eda0b8"/></svg>
+      <div><h1>LevelUp_AruAI</h1><p>Two AI agents: one asks, one teaches. Grow like a blossom.</p></div>
+    </div>
+    <div class="stats">
+      <button class="pill mode" id="sMode" type="button">Offline</button>
+      <div class="pill">Level<b id="sLevel">1</b></div>
+      <div class="pill">Streak<b id="sStreak">0</b></div>
+      <div class="pill xp"><small id="sRank">Python Hatchling</small> · <small id="sXp">0 XP</small><div class="bar"><i id="sBar"></i></div></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="chips" id="chips" aria-label="Topics"></nav>
+  <form class="custom" id="topicForm" hidden><input id="topicIn" maxlength="40" autocomplete="off" placeholder="Or type any topic, like f-strings, classes or sets" aria-label="Any Python topic"><button class="btn main" type="submit">Ask for it</button></form>
+  <section class="main">
+    <article class="card" id="qcard"><div class="loading">Question Agent is warming up…</div></article>
+    <aside class="card teacher" id="tcard" aria-live="polite"></aside>
+  </section>
+  <section class="lower">
+    <div class="card chat" id="chatCard">
+      <h3>Ask the Teacher</h3>
+      <div class="msgs" id="chatMsgs" aria-live="polite"><div class="cm ai">Hi! Ask me anything about Python or about the question you're on. I'll give you hints, not spoilers, until you've answered.</div></div>
+      <form class="chatform" id="chatForm"><input id="chatIn" maxlength="500" autocomplete="off" placeholder="Why does Python count from 0?" aria-label="Your question for the Teacher"><button class="btn main" type="submit">Send</button></form>
+      <p class="note" id="chatNote"></p>
+    </div>
+    <div class="card">
+      <h3>Agent channel</h3>
+      <div class="log" id="log"></div>
+      <p class="note">Every message the Question Agent and Teacher send each other, newest at the bottom.</p>
+    </div>
+    <div class="card topics">
+      <h3>Your topics</h3>
+      <div id="meters"></div>
+      <div class="actions"><button class="btn ghost" id="reset">Reset progress</button></div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="module">
+{
+// ============================================================ setup
+const PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/v0.27.2/full/";
+const RANKS = [[0,"Python Hatchling"],[100,"Code Explorer"],[250,"Loop Ranger"],[450,"Function Knight"],[700,"Data Wizard"],[1000,"Python Master"]];
+const BASE_TOPICS = ["variables","strings","lists","loops","conditionals","functions","dictionaries"];
+const LEVEL_NAMES = {1:"beginner: one idea, 2 to 5 lines", 2:"improver: combine two ideas, 4 to 8 lines", 3:"challenger: trickier logic such as nested loops, functions or comprehensions, 6 to 12 lines"};
+const KEY = "levelup_aruai_v2";
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const inline = s => esc(s).replace(/`([^`]+)`/g, '<code class="i">$1</code>');
+const oneLine = s => String(s).replace(/\n/g, " ⏎ ");
+const tidy = s => String(s ?? "").split("\n").map(l => l.replace(/\s+$/, "")).join("\n").replace(/\n+$/, "");
+
+let BANK = null, cur = null, answered = null, step = 0, choiceTopic = null;
+let live = false, pending = null, turn = 0, teachAbort = null, chat = [], chatBusy = false;
+
+const fresh = () => ({level:1, xp:0, focus:null, stats:{}, recent:[], hints:[], mistakes:[], concepts:[]});
+let S = fresh();
+try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved && saved.stats) S = {...fresh(), ...saved}; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const stat = t => S.stats[t] || (S.stats[t] = {attempts:0, correct:0, streak:0, miss:0});
+const rank = () => RANKS.filter(r => S.xp >= r[0]).pop()[1];
+const lessonOf = q => q.lesson || (BANK && BANK.lessons[q.concept]) || {title:"Read it line by line", explain:"Trace the code one line at a time and write down each variable.", example:"", tip:"Slow is smooth, smooth is fast."};
+
+// ============================================================ Python in the browser (checks answers, traces code)
+const PY_RUNNER = `
+import sys, io, json, contextlib
+_SIMPLE = (int, float, str, bool, list, tuple, dict, set, type(None))
+def _snap(ns):
+    out = {}
+    for k, v in list(ns.items()):
+        if k.startswith('__') or not isinstance(v, _SIMPLE):
+            continue
+        t = repr(v)
+        out[k] = t if len(t) <= 60 else t[:57] + '...'
+    return out
+def _noinput(*a):
+    raise RuntimeError("input() isn't used in LevelUp questions")
+def levelup_run(code):
+    steps = []
+    count = [0]
+    def tracer(frame, event, arg):
+        if frame.f_code.co_filename != '<levelup>':
+            return None
+        if event == 'line':
+            count[0] += 1
+            if count[0] > 20000:
+                raise RuntimeError('Too many steps (is there an endless loop?)')
+            if len(steps) < 60:
+                sc = frame.f_code.co_name
+                steps.append({'line': frame.f_lineno, 'scope': 'main' if sc == '<module>' else sc, 'vars': _snap(frame.f_locals)})
+        return tracer
+    ns = {'__name__': '__levelup__', 'input': _noinput}
+    buf = io.StringIO()
+    err = None
+    try:
+        compiled = compile(code, '<levelup>', 'exec')
+        with contextlib.redirect_stdout(buf):
+            sys.settrace(tracer)
+            try:
+                exec(compiled, ns)
+            finally:
+                sys.settrace(None)
+    except BaseException as e:
+        err = type(e).__name__ + ': ' + str(e)
+    return json.dumps({'output': buf.getvalue().rstrip(), 'error': err, 'trace': steps, 'final': _snap(ns)})
+`;
+let pyPromise = null;
+function loadPy() {
+  if (pyPromise) return pyPromise;
+  const boot = new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = PYODIDE_URL + "pyodide.js"; sc.onload = res; sc.onerror = () => rej(new Error("no pyodide"));
+    document.head.append(sc);
+  }).then(() => window.loadPyodide({indexURL: PYODIDE_URL}))
+    .then(py => { py.runPython(PY_RUNNER); say("c", "Python is running in your browser, ready to check every answer."); return py; });
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000));
+  pyPromise = Promise.race([boot, timeout]).catch(() => { say("c", "Python couldn't start here, so live answer keys can't be double-checked."); return null; });
+  return pyPromise;
+}
+async function runPy(code) {
+  const py = await loadPy();
+  if (!py) return null;
+  const fn = py.globals.get("levelup_run");
+  try { return JSON.parse(fn(code)); } finally { fn.destroy && fn.destroy(); }
+}
+
+// ============================================================ AI backend
+// The free relay (a Cloudflare Worker that keeps the Groq key secret). Without it, the app uses its built-in questions.
+const RELAY_URL = String(window.LEVELUP_RELAY || document.querySelector('meta[name="levelup-relay"]')?.content || "").trim().replace(/\/+$/, "");
+let backend = null;   // "relay" | null
+const aiName = () => "the free AI";
+const capName = () => "The free AI";
+async function relayPost(path, body, signal) {
+  let r;
+  try { r = await fetch(`${RELAY_URL}/${path}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal}); }
+  catch (e) { if (e && e.name === "AbortError") throw e; throw {code: "relay_unreachable"}; }
+  if (r.status === 429) throw {code: "rate_limited"};
+  if (!r.ok) throw {code: "relay_error", message: String(r.status)};
+  return r;
+}
+async function relayHealthy() {
+  if (!RELAY_URL) return false;
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+  try { const r = await fetch(RELAY_URL + "/health", {signal: ctl.signal}); const j = await r.json(); return !!(j.ok && j.configured); }
+  catch (e) { return false; } finally { clearTimeout(t); }
+}
+const AI = {
+  async question(ctx) {
+    const r = await relayPost("question", {ctx});
+    return (await r.json()).question;
+  },
+  async stream(kind, payload, onText, signal) {
+    const r = await relayPost(kind, payload, signal);
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let text = "";
+    for (;;) { const {done, value} = await reader.read(); if (done) break; text += dec.decode(value, {stream: true}); onText(text); }
+    return text.trim();
+  }
+};
+function aiTrouble(e) {
+  if (e && e.code === "rate_limited") { toast(`${capName()} needs a short break, here's a built-in question`); return true; }
+  return false;
+}
+const accuracyText = () => Object.entries(S.stats).filter(([, s]) => s.attempts).map(([t, s]) => `${t} ${Math.round(s.correct / s.attempts * 100)}%`).join(", ");
+const traceText = q => (q.trace || []).slice(0, 25).map(s => `line ${s.line}${s.scope !== "main" ? " in " + s.scope : ""}: ${Object.entries(s.vars).map(([k, v]) => k + "=" + v).join(", ") || "-"}`).join("\n");
+
+// ============================================================ Question Agent
+const QuestionAgent = {
+  pickTopic() {
+    if (choiceTopic) return choiceTopic;
+    if (S.focus) return S.focus;
+    return BASE_TOPICS[Math.floor(Math.random() * BASE_TOPICS.length)];
+  },
+  normalize(raw, topic, level) {
+    if (!raw || typeof raw.code !== "string" || !Array.isArray(raw.options)) return null;
+    const code = raw.code.replace(/\r/g, "").replace(/^\n+|\s+$/g, "");
+    const options = [...new Set(raw.options.map(tidy).filter(o => o !== ""))].slice(0, 4);
+    if (options.length < 4 || code.split("\n").length > 16) return null;
+    const mis = {};
+    for (const [k, v] of Object.entries(raw.misconceptions || {})) mis[tidy(k)] = String(v);
+    const L = raw.lesson || {};
+    return {
+      id: "live-" + Date.now(), live: true, topic, level, concept: String(raw.concept || topic).slice(0, 40),
+      code, prompt: "What does this code print?", options, answer: tidy(raw.answer), misconceptions: mis,
+      hint: String(raw.hint || "Trace it one line at a time."), why: String(raw.why || ""),
+      lesson: {title: String(L.title || raw.concept || topic), explain: String(L.explain || ""), example: String(L.example || ""), tip: String(L.tip || "")},
+      trace: [], final: {}
+    };
+  },
+  verify(q, run) {
+    if (!run) {
+      q.check = "unverified";
+      if (!q.options.includes(q.answer)) q.answer = q.options[0];
+      say("q", `Python isn't available, so this answer key is ${aiName()}'s best guess.`);
+    } else {
+      const truth = tidy(run.output);
+      q.trace = run.trace; q.final = run.final;
+      if (q.answer === truth) {
+        q.check = "ok";
+        say("q", `I ran it in Python and it prints <code class="i">${esc(oneLine(truth))}</code>. Answer key confirmed.`);
+      } else {
+        const old = q.answer;
+        if (q.options.includes(truth)) {
+          delete q.misconceptions[truth];
+        } else {
+          const i = q.options.indexOf(old);
+          const slot = i >= 0 ? i : 3;
+          delete q.misconceptions[q.options[slot]];
+          q.options[slot] = truth;
+        }
+        if (q.options.includes(old) && !q.misconceptions[old]) q.misconceptions[old] = "a tracing slip, so check each line again";
+        q.answer = truth; q.why = ""; q.check = "fixed";
+        say("q", `The AI's draft said <code class="i">${esc(oneLine(old))}</code>, but Python printed <code class="i">${esc(oneLine(truth))}</code>. I fixed the answer key before showing it.`);
+      }
+    }
+    for (const o of q.options) if (o !== q.answer && !q.misconceptions[o]) q.misconceptions[o] = "a small slip while tracing";
+    for (let i = q.options.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [q.options[i], q.options[j]] = [q.options[j], q.options[i]]; }
+    return q;
+  },
+  async live(topic, ctrl) {
+    const level = S.level;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      ctrl.stage = 0; ctrl.onStage && ctrl.onStage(0);
+      say("q", `Asking ${aiName()} for a level ${level} <b>${esc(topic)}</b> question…`);
+      const raw = await AI.question({topic, level, accuracy: accuracyText(), mistakes: S.mistakes.slice(-4), concepts: S.concepts.slice(-6)});
+      const q = this.normalize(raw, topic, level);
+      if (!q) { say("q", "That draft wasn't usable, asking again."); continue; }
+      ctrl.stage = 1; ctrl.onStage && ctrl.onStage(1);
+      const run = await runPy(q.code);
+      if (run && run.error) { say("q", `The draft crashed (${esc(run.error)}), asking again.`); continue; }
+      ctrl.stage = 2; ctrl.onStage && ctrl.onStage(2);
+      return this.verify(q, run);
+    }
+    throw new Error("no valid question");
+  },
+  offline(topic) {
+    const want = topic && BASE_TOPICS.includes(topic) ? topic : (BASE_TOPICS.includes(S.focus) ? S.focus : null);
+    let pool = BANK.questions.filter(q => q.level === S.level && (!want || q.topic === want));
+    if (!pool.length) pool = BANK.questions.filter(q => q.level === S.level);
+    const unseen = pool.filter(q => !S.recent.includes(q.code));
+    const list = unseen.length ? unseen : pool;
+    const q = {...list[Math.floor(Math.random() * list.length)], check: "bank"};
+    S.recent = [...S.recent.slice(-40), q.code];
+    say("q", `Here's a built-in level ${q.level} <b>${q.topic}</b> question. Its answer was checked by Python when it was made.`);
+    return q;
+  },
+  adjust(p) {
+    S.level = Math.max(1, Math.min(3, p.level)); S.focus = p.focus;
+    say("q", `Got it: level ${S.level}${p.focus ? `, focusing on <b>${esc(p.focus)}</b>` : ""}${p.target ? `, and I'll target "${esc(p.target)}"` : ""}.`);
+  }
+};
+
+// ============================================================ Teacher Agent
+const Teacher = {
+  lesson(q) { say("t", `Thanks! I'll teach <b>${esc(lessonOf(q).title)}</b> alongside it.`); },
+  hint(q) { if (!S.hints.includes(q.id + q.code)) S.hints.push(q.id + q.code); say("c", "Learner asked for a hint."); return q.hint; },
+  assess(q, choice) {
+    const ok = choice === q.answer, st = stat(q.topic);
+    st.attempts++;
+    let gained = 0, change = null;
+    if (ok) { st.correct++; st.streak++; st.miss = 0; gained = 10 * q.level + (S.hints.includes(q.id + q.code) ? 0 : 5) + (st.streak >= 3 ? 5 : 0); S.xp += gained; }
+    else { st.streak = 0; st.miss++; S.mistakes = [...S.mistakes.slice(-7), q.misconceptions[choice] || "a small slip"]; }
+    if (st.streak >= 3 && S.level < 3) { S.level++; st.streak = 0; change = "up"; }
+    else if (st.miss >= 2 && S.level > 1) { S.level--; st.miss = 0; change = "down"; }
+    S.concepts = [...S.concepts.slice(-7), q.concept];
+    const tried = Object.entries(S.stats).filter(([, s]) => s.attempts);
+    tried.sort((a, b) => a[1].correct / a[1].attempts - b[1].correct / b[1].attempts || b[1].attempts - a[1].attempts);
+    const weak = tried.length && tried[0][1].correct / tried[0][1].attempts < .6 ? tried[0][0] : null;
+    const target = ok ? null : q.misconceptions[choice];
+    const verdict = ok ? `Correct! +${gained} XP.` : `Not quite. Picking '${oneLine(choice)}' usually comes from ${q.misconceptions[choice] || "a small slip"}. The answer is '${oneLine(q.answer)}'.`;
+    say("c", `Learner answered: ${ok ? "correct ✓" : "wrong ✗"}`);
+    say("t", `Question Agent: next please level ${S.level}${weak ? `, practise <b>${esc(weak)}</b>` : ""}.`);
+    QuestionAgent.adjust({level: S.level, focus: weak, target});
+    return {ok, gained, change, verdict, explain: q.why || "", streaming: false};
+  },
+  async explainLive(q, choice, ok) {
+    teachAbort && teachAbort.abort();
+    const ctl = new AbortController(); teachAbort = ctl;
+    const ctx = {code: q.code, options: q.options, choice, answer: q.answer, ok, trace: traceText(q)};
+    answered.streaming = true; answered.explain = ""; paintExplain();
+    try {
+      const text = await AI.stream("explain", {ctx}, t => { if (teachAbort === ctl && answered) { answered.explain = t; paintExplain(); } }, ctl.signal);
+      if (teachAbort === ctl && answered) { answered.explain = text; say("t", "Explained the answer step by step."); }
+    } catch (e) {
+      if (teachAbort === ctl && answered) { answered.explain = q.why || "Use the step-through below to watch each line run."; aiTrouble(e); }
+    }
+    if (teachAbort === ctl && answered) { answered.streaming = false; paintExplain(); }
+  }
+};
+
+function say(who, html) {
+  const row = document.createElement("div");
+  row.className = "msg from-" + who;
+  row.innerHTML = `<span class="who2">${who === "q" ? "Question Agent" : who === "t" ? "Teacher" : "App"}</span><span>${html}</span>`;
+  const log = $("log"); log.append(row);
+  while (log.children.length > 80) log.firstChild.remove();
+  log.scrollTop = log.scrollHeight;
+}
+
+// ============================================================ rendering
+const PYRE = /(#.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(def|return|if|elif|else|for|while|in|and|or|not|True|False|None|class|import|from|lambda|break|continue|pass|try|except)\b|\b(\d+)\b|\b(print|range|len|str|int|sum|max|min|sorted|list|dict|set|round|abs|enumerate|zip)\b/gm;
+const colour = line => { let out = "", last = 0; line.replace(PYRE, (m, c, s, k, d, f, i) => { out += esc(line.slice(last, i)); out += `<span class="${c ? "c" : s ? "s" : k ? "k" : d ? "d" : "f"}">${esc(m)}</span>`; last = i + m.length; return m; }); return out + esc(line.slice(last)); };
+
+function renderStats() {
+  $("sLevel").textContent = S.level;
+  $("sStreak").textContent = Object.values(S.stats).reduce((m, s) => Math.max(m, s.streak), 0);
+  $("sRank").textContent = rank(); $("sXp").textContent = S.xp + " XP";
+  const i = RANKS.findIndex(r => r[1] === rank()), lo = RANKS[i][0], hi = (RANKS[i + 1] || [lo + 1])[0];
+  $("sBar").style.width = Math.min(100, (S.xp - lo) / (hi - lo) * 100) + "%";
+  $("sMode").textContent = live ? "Live AI" : "Offline";
+  $("sMode").classList.toggle("live", live);
+  $("sMode").title = backend ? (live ? `${capName()} writes questions. Click to practise offline.` : `Built-in questions. Click to go live with ${aiName()}.`) : "Live AI isn't available in this view";
+  const topics = [...BASE_TOPICS, ...Object.keys(S.stats).filter(t => !BASE_TOPICS.includes(t) && S.stats[t].attempts)];
+  $("meters").innerHTML = topics.map(t => { const s = stat(t), p = s.attempts ? Math.round(s.correct / s.attempts * 100) : 0;
+    return `<div class="meter"><span>${esc(t)}</span><span class="track"><i style="width:${p}%"></i></span><span class="pct">${s.attempts ? p + "%" : "–"}</span></div>`; }).join("");
+  const chips = ["Mixed", ...BASE_TOPICS]; if (choiceTopic && !BASE_TOPICS.includes(choiceTopic)) chips.push(choiceTopic);
+  $("chips").innerHTML = chips.map(t => { const v = t === "Mixed" ? null : t; return `<button class="chip" data-t="${esc(t)}" aria-pressed="${choiceTopic === v}">${esc(t)}</button>`; }).join("");
+  $("topicForm").hidden = !live;
+}
+function renderCode(hl) { return `<div class="screen" role="img" aria-label="Python code">${cur.code.split("\n").map((l, i) => `<div class="ln${hl === i + 1 ? " on" : ""}"><span class="n">${i + 1}</span><code>${colour(l) || " "}</code></div>`).join("")}</div>`; }
+function checkBadge(q) {
+  return q.check === "ok" ? '<span class="badge ok">Answer checked by Python</span>'
+    : q.check === "fixed" ? '<span class="badge fix">Answer key fixed by Python</span>'
+    : q.check === "unverified" ? '<span class="badge fix">Not double-checked</span>'
+    : '<span class="badge ok">Built-in, checked by Python</span>';
+}
+function renderQuestion() {
+  const q = cur, hl = answered && q.trace && q.trace[step] ? q.trace[step].line : 0;
+  $("qcard").innerHTML = `<div class="qhead"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag">${esc(q.topic)}</span><span class="tag lvl">Level ${q.level}</span>${checkBadge(q)}</div><span class="scope">${S.focus ? "Teacher's focus: " + esc(S.focus) : "Mixed practice"}</span></div>
+  ${renderCode(hl)}
+  <p class="prompt">${esc(q.prompt)}</p>
+  <div class="opts">${q.options.map((o, i) => { let c = ""; if (answered) { if (o === q.answer) c = "right"; else if (o === answered.choice) c = "wrong"; }
+    return `<button class="opt ${c}" data-i="${i}" ${answered ? "disabled" : ""}><kbd>${i + 1}</kbd><span>${esc(o)}</span></button>`; }).join("")}</div>
+  <div class="actions">${answered ? `<button class="btn main" id="next">Next question →</button>` : `<button class="btn ghost" id="hint">Ask Teacher for a hint</button>`}</div>`;
+}
+function teacherHead(title) {
+  return `<span class="who">Teacher Agent${live ? " · Free AI" : ""}</span><h2><svg class="avatar" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#ffd6e3"/><rect x="9" y="14" width="9" height="7" rx="3" fill="none" stroke="#5a2f35" stroke-width="2"/><rect x="22" y="14" width="9" height="7" rx="3" fill="none" stroke="#5a2f35" stroke-width="2"/><path d="M18 17h4M14 28c3 3 9 3 12 0" stroke="#5a2f35" stroke-width="2" fill="none" stroke-linecap="round"/></svg>${esc(title)}</h2>`;
+}
+function renderTeacher() {
+  const q = cur, L = lessonOf(q);
+  let html = teacherHead(L.title) + `<div class="lesson"><p>${inline(L.explain)}</p>${L.example ? `<pre>${esc(L.example)}</pre>` : ""}${L.tip ? `<div class="tip">${inline(L.tip)}</div>` : ""}</div>`;
+  if (cur._hint && !answered) html += `<div class="bubble hint"><b>Hint:</b> ${inline(cur._hint)}</div>`;
+  if (answered) {
+    html += `<div class="bubble ${answered.ok ? "good" : "bad"}"><b>${inline(answered.verdict)}</b><div id="explain" style="margin-top:6px"></div></div>`;
+    if (q.trace && q.trace.length) {
+      const t = q.trace[step], last = step >= q.trace.length, vars = last ? q.final : t.vars;
+      html += `<div class="stepper"><header><strong>${last ? "Finished" : `Step ${step + 1} of ${q.trace.length}: line ${t.line}`}</strong>
+        <div class="nav"><button id="prev" aria-label="Previous step">‹</button><button id="nxt" aria-label="Next step">›</button></div></header>
+        ${!last && t.scope !== "main" ? `<div class="scope">inside <code class="i">${esc(t.scope)}()</code></div>` : ""}
+        <div class="vars">${Object.keys(vars).length ? Object.entries(vars).map(([k, v]) => `<span class="var"><b>${esc(k)}</b> = ${esc(v)}</span>`).join("") : '<span class="scope">No variables yet</span>'}</div>
+        <div class="scope" style="margin-top:8px">${last ? `Printed: <code class="i">${esc(oneLine(q.answer))}</code>` : "Variables just before this line runs."}</div></div>`;
+    }
+  }
+  $("tcard").innerHTML = html;
+  paintExplain();
+}
+function paintExplain() {
+  const el = $("explain"); if (!el || !answered) return;
+  el.innerHTML = answered.streaming && !answered.explain ? '<span class="scope">Teacher is writing an explanation…</span>' : inline(answered.explain);
+  el.classList.toggle("typing", !!answered.streaming);
+}
+function render() { renderStats(); renderQuestion(); renderTeacher(); }
+function renderStart(state) {
+  renderStats();
+  const ready = state === "ready";
+  $("qcard").innerHTML = `<div class="start"><h2>Ready to grow?</h2>
+    <p>In live mode, AI writes a fresh question just for you, Python checks the answer, and the Teacher explains it and answers anything you ask.</p>
+    <div class="actions"><button class="btn main" id="goLive" ${ready ? "" : "disabled"}>${ready ? "Start live lesson" : "Connecting to live AI…"}</button><button class="btn ghost" id="goOffline">Practise offline</button></div></div>`;
+  $("tcard").innerHTML = teacherHead("Hi, I'm your Teacher") + `<div class="lesson"><p>I'll show a mini-lesson next to every question, explain each answer, and you can ask me anything in the chat below.</p><div class="tip">Answer with the 1–4 keys, then use ← → to step through the code.</div></div>`;
+}
+function renderWorking(stage, topic) {
+  const steps = [`${capName()} is writing a <b>${esc(topic)}</b> question`, "Python is running the code", "Checking the answer key"];
+  $("qcard").innerHTML = `<div class="working" aria-live="polite"><h2>Question Agent at work</h2><ol>${steps.map((s, i) => `<li class="${i < stage ? "done" : i === stage ? "on" : ""}"><span class="dot"></span>${s}</li>`).join("")}</ol></div>`;
+}
+function toast(t) { $("toast").textContent = t; $("toast").classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => $("toast").classList.remove("show"), 2600); }
+
+// ============================================================ flow (the coordinator)
+function startLiveRequest() {
+  const ctrl = {stage: 0, onStage: null, topic: QuestionAgent.pickTopic()};
+  ctrl.promise = QuestionAgent.live(ctrl.topic, ctrl).then(q => ({q}), err => ({err}));
+  return ctrl;
+}
+function showOffline() {
+  cur = QuestionAgent.offline(choiceTopic); Teacher.lesson(cur); save(); render();
+}
+async function next() {
+  answered = null; step = 0; teachAbort && teachAbort.abort(); teachAbort = null;
+  const my = ++turn;
+  if (!live) { pending = null; say("c", `Requesting a question${choiceTopic ? " on " + esc(choiceTopic) : ""}.`); showOffline(); return; }
+  const ctrl = pending || startLiveRequest(); pending = null;
+  say("c", `Requesting a live question on ${esc(ctrl.topic)}.`);
+  ctrl.onStage = s => { if (my === turn) renderWorking(s, ctrl.topic); };
+  renderStats(); renderWorking(ctrl.stage, ctrl.topic);
+  const res = await ctrl.promise;
+  if (my !== turn) return;
+  ctrl.onStage = null;
+  if (res.q) { cur = res.q; Teacher.lesson(cur); save(); render(); return; }
+  if (!aiTrouble(res.err)) toast("Couldn't get a live question, here's a built-in one");
+  showOffline();
+}
+function pick(i) {
+  if (answered) return;
+  const choice = cur.options[i];
+  answered = {...Teacher.assess(cur, choice), choice};
+  step = 0; save(); render();
+  if (answered.change === "up") toast(`Level up! Now level ${S.level}`);
+  else if (answered.change === "down") toast(`Back to level ${S.level}, let's build up`);
+  else if (answered.ok) toast(`+${answered.gained} XP`);
+  if (live) {
+    Teacher.explainLive(cur, choice, answered.ok);
+    pending = startLiveRequest();       // the next question is written while you read the explanation
+  }
+}
+function goOffline(msg) { live = false; pending = null; if (msg) toast(msg); renderStats(); }
+
+// ------------------------------------------------------------ Ask the Teacher chat
+function addCm(who, text) { const d = document.createElement("div"); d.className = "cm " + who; d.textContent = text; $("chatMsgs").append(d); $("chatMsgs").scrollTop = $("chatMsgs").scrollHeight; return d; }
+async function sendChat(text) {
+  text = text.trim(); if (!text || chatBusy) return;
+  addCm("user", text);
+  if (!live) { addCm("ai", backend ? "Switch to Live AI (the button at the top) and I can answer that properly!" : "Chatting needs live AI, which isn't available in this view. The built-in lessons are still here for you."); return; }
+  chatBusy = true; $("chatForm").querySelector("button").disabled = true;
+  chat.push({role: "user", content: text});
+  const el = addCm("ai", ""); el.classList.add("typing");
+  const ctx = {level: S.level, question: cur ? {topic: cur.topic, level: cur.level, code: cur.code, options: cur.options} : null,
+               answered: answered && cur ? {ok: answered.ok, answer: cur.answer} : null};
+  try {
+    const reply = await AI.stream("chat", {ctx, history: chat.slice(-10)}, t => { el.textContent = t; $("chatMsgs").scrollTop = $("chatMsgs").scrollHeight; });
+    el.textContent = reply; chat.push({role: "assistant", content: reply});
+    say("t", "Answered a question in the chat.");
+  } catch (e) {
+    chat.pop();
+    el.textContent = e && e.code === "rate_limited" ? "I need a tiny break. Try again in a minute!" : "Sorry, I couldn't answer just now. Try again?";
+  }
+  el.classList.remove("typing"); chatBusy = false; $("chatForm").querySelector("button").disabled = false;
+}
+
+// ------------------------------------------------------------ events
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.classList.contains("opt")) pick(+b.dataset.i);
+  else if (b.id === "next") next();
+  else if (b.id === "hint") { cur._hint = Teacher.hint(cur); renderTeacher(); }
+  else if (b.id === "prev") { step = Math.max(0, step - 1); renderQuestion(); renderTeacher(); }
+  else if (b.id === "nxt") { step = Math.min(cur.trace.length, step + 1); renderQuestion(); renderTeacher(); }
+  else if (b.classList.contains("chip")) { choiceTopic = b.dataset.t === "Mixed" ? null : b.dataset.t; pending = null; next(); }
+  else if (b.id === "goLive") { live = true; loadPy(); next(); }
+  else if (b.id === "goOffline") { live = false; next(); }
+  else if (b.id === "sMode") {
+    if (!backend) { toast("Live AI isn't available in this view"); return; }
+    live = !live; pending = null; if (live) loadPy(); toast(live ? `Live AI on: ${aiName()} writes your questions` : "Offline: built-in questions"); next();
+  }
+  else if (b.id === "reset") { S = fresh(); save(); $("log").innerHTML = ""; toast("Progress reset"); pending = null; next(); }
+});
+$("topicForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = $("topicIn").value.replace(/[^\w\s\-+.#()'/]/g, "").trim().toLowerCase().slice(0, 40);
+  if (!t) return;
+  choiceTopic = t; pending = null; $("topicIn").value = ""; next();
+});
+$("chatForm").addEventListener("submit", e => { e.preventDefault(); const v = $("chatIn").value; $("chatIn").value = ""; sendChat(v); });
+document.addEventListener("keydown", e => {
+  if (!cur || e.target.closest("input,textarea")) return;
+  if (!answered && /^[1-4]$/.test(e.key) && $("qcard").querySelector(".opt")) pick(+e.key - 1);
+  else if (answered && (e.key === "Enter" || e.key === "n")) next();
+  else if (answered && e.key === "ArrowRight" && cur.trace.length) { step = Math.min(cur.trace.length, step + 1); renderQuestion(); renderTeacher(); }
+  else if (answered && e.key === "ArrowLeft") { step = Math.max(0, step - 1); renderQuestion(); renderTeacher(); }
+});
+
+// ------------------------------------------------------------ boot
+async function boot() {
+  renderStart("connecting");
+  if (await relayHealthy()) backend = "relay";
+  if (backend) { say("c", "Free live AI is connected. Press Start for a live lesson."); loadPy(); renderStart("ready"); }
+  else { say("c", "Live AI isn't available in this view, so we'll use the built-in questions."); live = false; next(); }
+}
+fetch("bank.json").then(r => r.json()).then(d => { BANK = d; say("c", `Loaded ${d.questions.length} built-in questions as a backup.`); boot(); })
+  .catch(() => { $("qcard").innerHTML = '<div class="loading">Couldn\'t load the question bank. Try reloading the page.</div>'; });
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+# Publishes the relay (Cloudflare Worker) and the app (GitHub Pages) on every push to main.
+# Needs: secrets GROQ_API_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+#        variable RELAY_URL (the Worker address, after its first deploy)
+name: Deploy LevelUp_AruAI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pytest
+      - run: npm run test:relay
+      - run: python -m pytest -q tests/test_levelup.py
+
+  relay:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: relay
+          secrets: GROQ_API_KEY
+          command: deploy --var ALLOWED_ORIGINS:https://${{ github.repository_owner }}.github.io
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+  pages:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point the app at the relay
+        env:
+          RELAY_URL: ${{ vars.RELAY_URL }}
+        run: sed -i "s#<meta name=\"levelup-relay\" content=\"[^\"]*\">#<meta name=\"levelup-relay\" content=\"${RELAY_URL}\">#" web/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: web}
+      - id: deploy
+        uses: actions/deploy-pages@v4

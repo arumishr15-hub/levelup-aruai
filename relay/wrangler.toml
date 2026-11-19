@@ -1,0 +1,13 @@
+# Cloudflare Worker that holds the free Groq key for LevelUp_AruAI.
+# Deploy:  npx wrangler deploy        Key:  npx wrangler secret put GROQ_API_KEY
+name = "levelup-aruai-relay"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+MODEL = "openai/gpt-oss-120b"        # main free model
+FALLBACK_MODEL = "openai/gpt-oss-20b" # used when the main model is busy or retired
+API_BASE = "https://api.groq.com/openai/v1"
+REASONING_EFFORT = "low"
+PER_IP_PER_MINUTE = "12"             # protects the shared free allowance
+ALLOWED_ORIGINS = "*"                # the deploy workflow sets this to your GitHub Pages address

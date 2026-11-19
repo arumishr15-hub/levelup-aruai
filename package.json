@@ -1,0 +1,14 @@
+{
+  "name": "levelup-aruai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:relay": "node --test relay/test/worker.test.mjs",
+    "dev:relay": "node relay/dev-server.mjs",
+    "deploy:relay": "cd relay && npx wrangler deploy",
+    "test": "node --test relay/test/worker.test.mjs && python -m pytest -q"
+  },
+  "devDependencies": {
+    "pyodide": "0.27.2"
+  }
+}
